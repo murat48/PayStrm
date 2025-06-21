@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freighter Soroban Test</title>
+    <script type="module" src="https://unpkg.com/@stellar/stellar-sdk@latest/dist/stellar-sdk.min.js"></script>
+</head>
+<body>
+    <h1>Freighter Soroban Contract Test</h1>
+    
+    <div id="status">Checking Freighter...</div>
+    <button id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
+    <button id="testBtn" onclick="testContractCall()" disabled>Test Contract Call</button>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        import { 
+            getPublicKey, 
+            signTransaction, 
+            isConnected 
+        } from 'https://unpkg.com/@stellar/freighter-api@latest/dist/index.js';
+
+        window.getPublicKey = getPublicKey;
+        window.signTransaction = signTransaction;
+        window.isConnected = isConnected;
+
+        function log(message) {
+            console.log(message);
+            document.getElementById('results').innerHTML += '<p>' + message + '</p>';
+        }
+
+        window.connectWallet = async function() {
+            try {
+                log('🔄 Connecting to Freighter...');
+                const publicKey = await getPublicKey();
+                log('✅ Connected! Public Key: ' + publicKey);
+                document.getElementById('testBtn').disabled = false;
+                document.getElementById('status').innerHTML = '✅ Connected: ' + publicKey.substring(0, 10) + '...';
+            } catch (error) {
+                log('❌ Connection failed: ' + error.message);
+            }
+        };
+
+        window.testContractCall = async function() {
+            try {
+                log('🧪 Testing Soroban contract call...');
+                
+                // Test parameters
+                const contractId = 'CCTSOF3ALAAZHTS3FYLXM6Y7J3EEVVPQMUDCYKOPRDVFIFNWRZXNNYS3';
+                const publicKey = await getPublicKey();
+                
+                log('📋 Contract ID: ' + contractId);
+                log('👤 Public Key: ' + publicKey);
+                
+                // Create a simple Soroban transaction
+                const { StellarSdk } = window;
+                const { 
+                    TransactionBuilder, 
+                    Account, 
+                    Contract, 
+                    nativeToScVal,
+                    Networks,
+                    rpc
+                } = StellarSdk;
+                
+                const server = new rpc.Server('https://soroban-testnet.stellar.org');
+                const contract = new Contract(contractId);
+                
+                log('🔄 Fetching account info...');
+                const account = await server.getAccount(publicKey);
+                log('✅ Account fetched, sequence: ' + account.sequenceNumber());
+                
+                // Build transaction
+                log('🏗️ Building transaction...');
+                const transaction = new TransactionBuilder(account, {
+                    fee: '1000000',
+                    networkPassphrase: Networks.TESTNET,
+                })
+                .addOperation(contract.call(
+                    'create_stream',
+                    nativeToScVal(publicKey, { type: 'address' }),
+                    nativeToScVal('GCNA5EMJNXZPO57ARVJYQ5SN2DYYPD6ZCCENQ5AQTMVNKN77RDIPMI3A', { type: 'address' }),
+                    nativeToScVal(1000000000, { type: 'i128' }),
+                    nativeToScVal(2592000, { type: 'u64' })
+                ))
+                .setTimeout(300)
+                .build();
+                
+                const xdr = transaction.toXDR();
+                log('✅ Transaction built successfully');
+                log('📋 XDR length: ' + xdr.length);
+                log('📊 Operation type: ' + transaction.operations[0].type);
+                
+                // Sign with Freighter
+                log('✍️ Requesting signature from Freighter...');
+                log('🚨 ÖNEMLI: Freighter\'da "Invoke Host Function" seçeneğini görmelisiniz!');
+                
+                const signedTx = await signTransaction(xdr, {
+                    networkPassphrase: Networks.TESTNET
+                });
+                
+                log('✅ Transaction signed successfully!');
+                log('📋 Signed XDR length: ' + signedTx.signedTxXdr.length);
+                
+            } catch (error) {
+                log('❌ Test failed: ' + error.message);
+                console.error('Full error:', error);
+            }
+        };
+
+        // Check initial connection
+        async function checkConnection() {
+            try {
+                const connected = await isConnected();
+                if (connected.isConnected) {
+                    document.getElementById('connectBtn').click();
+                }
+            } catch (e) {
+                log('❌ Initial connection check failed: ' + e.message);
+            }
+        }
+
+        checkConnection();
+    </script>
+</body>
+</html>

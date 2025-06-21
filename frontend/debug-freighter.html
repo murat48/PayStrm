@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freighter Debug Test</title>
+</head>
+<body>
+    <h1>Freighter Extension Debug Test</h1>
+    
+    <div id="status">Checking Freighter...</div>
+    <button id="testBtn" onclick="testFreighter()">Test Freighter Connection</button>
+    
+    <div id="results"></div>
+
+    <script>
+        function log(message) {
+            console.log(message);
+            document.getElementById('results').innerHTML += '<p>' + message + '</p>';
+        }
+
+        function checkFreighter() {
+            log('🔍 Checking for Freighter extension...');
+            
+            if (typeof window.freighter !== 'undefined') {
+                log('✅ Freighter object found in window');
+                document.getElementById('status').innerHTML = '✅ Freighter Detected';
+                document.getElementById('testBtn').disabled = false;
+                return true;
+            } else {
+                log('❌ Freighter not found in window object');
+                document.getElementById('status').innerHTML = '❌ Freighter Not Found';
+                document.getElementById('testBtn').disabled = true;
+                return false;
+            }
+        }
+
+        async function testFreighter() {
+            log('🔄 Testing Freighter API...');
+            
+            try {
+                // Import the functions dynamically
+                const { isConnected, requestAccess, getAddress } = await import('@stellar/freighter-api');
+                
+                log('✅ Freighter API imported successfully');
+                
+                // Check connection
+                const connectionResult = await isConnected();
+                log('📊 Connection check result: ' + JSON.stringify(connectionResult));
+                
+                if (!connectionResult.isConnected) {
+                    log('🔄 Requesting access...');
+                    await requestAccess();
+                    log('✅ Access granted');
+                }
+                
+                // Get address
+                const addressResult = await getAddress();
+                log('📊 Address result: ' + JSON.stringify(addressResult));
+                
+                if (addressResult && addressResult.address) {
+                    log('🎉 Successfully connected to: ' + addressResult.address);
+                } else {
+                    log('❌ Failed to get address');
+                }
+                
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                console.error('Full error:', error);
+            }
+        }
+
+        // Check immediately and periodically
+        checkFreighter();
+        setInterval(checkFreighter, 2000);
+    </script>
+</body>
+</html>

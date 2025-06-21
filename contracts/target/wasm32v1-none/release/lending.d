@@ -1,0 +1,1 @@
+/home/muratkeskin/projehackton/b/contracts/target/wasm32v1-none/release/lending.wasm: /home/muratkeskin/projehackton/b/contracts/lending/src/lib.rs /home/muratkeskin/projehackton/b/contracts/lending/src/test.rs

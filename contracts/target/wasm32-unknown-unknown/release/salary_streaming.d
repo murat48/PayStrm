@@ -1,0 +1,1 @@
+/home/muratkeskin/projehackton/b/contracts/target/wasm32-unknown-unknown/release/salary_streaming.wasm: /home/muratkeskin/projehackton/b/contracts/salary-streaming/src/lib.rs /home/muratkeskin/projehackton/b/contracts/salary-streaming/src/test.rs

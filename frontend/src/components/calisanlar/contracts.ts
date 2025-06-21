@@ -1,0 +1,39 @@
+// // Debug environment variables
+// console.log('🔧 Environment Debug:');
+// console.log('  NODE_ENV:', process.env.NODE_ENV);
+// console.log('  NEXT_PUBLIC_ENVIRONMENT:', process.env.NEXT_PUBLIC_ENVIRONMENT);
+// console.log('  NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE:', process.env.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE);
+// console.log('  NEXT_PUBLIC_STELLAR_RPC_URL:', process.env.NEXT_PUBLIC_STELLAR_RPC_URL);
+// console.log('  NEXT_PUBLIC_LENDING_CONTRACT_ID:', process.env.NEXT_PUBLIC_LENDING_CONTRACT_ID);
+// console.log('  NEXT_PUBLIC_SALARY_STREAMING_CONTRACT_ID:', process.env.NEXT_PUBLIC_SALARY_STREAMING_CONTRACT_ID);
+// console.log('  NEXT_PUBLIC_WORK_PROFILE_CONTRACT_ID:', process.env.NEXT_PUBLIC_WORK_PROFILE_CONTRACT_ID);
+
+// // Contract addresses from environment variables
+// export const CONTRACT_ADDRESSES = {
+//   LENDING: process.env.NEXT_PUBLIC_LENDING_CONTRACT_ID || 'CDCOO2LZWZQDKA2IZZTJLX6KIY37BXI55BU557QN53ODBFA3WNGY2BHI',
+//   SALARY_STREAMING: process.env.NEXT_PUBLIC_SALARY_STREAMING_CONTRACT_ID || 'CCTSOF3ALAAZHTS3FYLXM6Y7J3EEVVPQMUDCYKOPRDVFIFNWRZXNNYS3',
+//   WORK_PROFILE: process.env.NEXT_PUBLIC_WORK_PROFILE_CONTRACT_ID || 'CCAHTMF7PDOB2KM4SIDDHBW2AMVGEWCTLKG3BSYJNTFGMASSGMKO6OKT',
+// };
+
+// export const NETWORK_CONFIG = {
+//   networkPassphrase: process.env.NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE || 'Test SDF Network ; September 2015',
+//   rpcUrl: process.env.NEXT_PUBLIC_STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org',
+//   environment: process.env.NEXT_PUBLIC_ENVIRONMENT || 'testnet',
+// };
+
+// // Validate required environment variables
+// if (typeof window === 'undefined') {
+//   // Only validate on server side to avoid hydration issues
+//   const requiredEnvVars = [
+//     'GALDPLQ62RAX3V7RJE73D3C2F4SKHGCJ3MIYJ4MLU2EAIUXBDSUVS7SA',
+//     'CDCOO2LZWZQDKA2IZZTJLX6KIY37BXI55BU557QN53ODBFA3WNGY2BHI',
+//     'CCTSOF3ALAAZHTS3FYLXM6Y7J3EEVVPQMUDCYKOPRDVFIFNWRZXNNYS3', 
+//     'CCAHTMF7PDOB2KM4SIDDHBW2AMVGEWCTLKG3BSYJNTFGMASSGMKO6OKT',
+//   ];
+  
+//   const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+//   if (missingVars.length > 0) {
+//     console.warn(`Warning: Missing environment variables: ${missingVars.join(', ')}`);
+//     console.warn('Using fallback contract addresses...');
+//   }
+// }

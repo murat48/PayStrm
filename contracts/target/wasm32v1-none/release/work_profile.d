@@ -1,0 +1,1 @@
+/home/muratkeskin/projehackton/b/contracts/target/wasm32v1-none/release/work_profile.wasm: /home/muratkeskin/projehackton/b/contracts/work-profile/src/lib.rs /home/muratkeskin/projehackton/b/contracts/work-profile/src/test.rs

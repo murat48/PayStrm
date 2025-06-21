@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stream Contract Test</title>
+    <script type="module">
+        import { Contract, rpc, TransactionBuilder, nativeToScVal } from 'https://esm.sh/@stellar/stellar-sdk@13.3.0';
+        import { signTransaction } from 'https://esm.sh/@stellar/freighter-api@4.1.0';
+
+        // Test configuration
+        const CONFIG = {
+            contractId: 'CCTSOF3ALAAZHTS3FYLXM6Y7J3EEVVPQMUDCYKOPRDVFIFNWRZXNNYS3',
+            networkPassphrase: 'Test SDF Network ; September 2015',
+            rpcUrl: 'https://soroban-testnet.stellar.org',
+            employer: 'GALDPLQ62RAX3V7RJE73D3C2F4SKHGCJ3MIYJ4MLU2EAIUXBDSUVS7SA',
+            employee: 'GCNA5EMJNXZPO57ARVJYQ5SN2DYYPD6ZCCENQ5AQTMVNKN77RDIPMI3A',
+            totalAmount: 1000000000,
+            durationSeconds: 2592000
+        };
+
+        function log(message) {
+            console.log(message);
+            const output = document.getElementById('output');
+            output.innerHTML += '<div>' + message + '</div>';
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function testContractCall() {
+            try {
+                log('🚀 Starting contract call test...');
+                
+                // Initialize server
+                const server = new rpc.Server(CONFIG.rpcUrl);
+                log('✅ Server initialized');
+                
+                // Create contract
+                const contract = new Contract(CONFIG.contractId);
+                log('✅ Contract created');
+                
+                // Get account
+                log('📋 Getting account: ' + CONFIG.employer);
+                const account = await server.getAccount(CONFIG.employer);
+                log('✅ Account retrieved');
+                
+                // Prepare arguments
+                log('🔧 Preparing arguments...');
+                const args = [
+                    nativeToScVal(CONFIG.employer, { type: 'address' }),
+                    nativeToScVal(CONFIG.employee, { type: 'address' }),
+                    nativeToScVal(CONFIG.totalAmount, { type: 'i128' }),
+                    nativeToScVal(CONFIG.durationSeconds, { type: 'u64' })
+                ];
+                
+                log('✅ Arguments prepared');
+                log('  - Employer: ' + CONFIG.employer);
+                log('  - Employee: ' + CONFIG.employee);
+                log('  - Amount: ' + CONFIG.totalAmount);
+                log('  - Duration: ' + CONFIG.durationSeconds);
+                
+                // Build transaction
+                log('🔧 Building transaction...');
+                const transaction = new TransactionBuilder(account, {
+                    fee: '1000000',
+                    networkPassphrase: CONFIG.networkPassphrase,
+                })
+                .addOperation(contract.call('create_stream', ...args))
+                .setTimeout(300)
+                .build();
+                
+                log('✅ Transaction built');
+                
+                // Get XDR
+                const xdr = transaction.toXDR();
+                log('✅ XDR generated: ' + xdr.substring(0, 50) + '...');
+                
+                // Test simulation first
+                log('🧪 Testing simulation...');
+                const simulationResult = await server.simulateTransaction(transaction);
+                log('✅ Simulation result: ' + JSON.stringify(simulationResult.results?.[0], null, 2));
+                
+                if (simulationResult.error) {
+                    log('❌ Simulation error: ' + simulationResult.error);
+                    return;
+                }
+                
+                log('🎉 Ready for Freighter signing!');
+                document.getElementById('signBtn').disabled = false;
+                
+                window.testXdr = xdr;
+                
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        async function signWithFreighter() {
+            try {
+                log('🔏 Signing with Freighter...');
+                
+                const signedResult = await signTransaction(window.testXdr, {
+                    networkPassphrase: CONFIG.networkPassphrase
+                });
+                
+                log('✅ Signed successfully!');
+                log('📋 Signed XDR: ' + signedResult.signedTxXdr.substring(0, 50) + '...');
+                
+                // Submit transaction
+                log('📤 Submitting transaction...');
+                const server = new rpc.Server(CONFIG.rpcUrl);
+                const transaction = TransactionBuilder.fromXDR(signedResult.signedTxXdr, CONFIG.networkPassphrase);
+                const result = await server.sendTransaction(transaction);
+                
+                log('🎉 Transaction submitted!');
+                log('🆔 Hash: ' + result.hash);
+                log('📊 Status: ' + result.status);
+                
+            } catch (error) {
+                log('❌ Signing error: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        window.testContractCall = testContractCall;
+        window.signWithFreighter = signWithFreighter;
+    </script>
+</head>
+<body>
+    <h1>Stream Contract Test</h1>
+    <button onclick="testContractCall()">Test Contract Call</button>
+    <button id="signBtn" onclick="signWithFreighter()" disabled>Sign with Freighter</button>
+    
+    <div id="output" style="background: #f0f0f0; padding: 10px; margin-top: 20px; height: 400px; overflow-y: scroll; font-family: monospace; white-space: pre-wrap;"></div>
+</body>
+</html>

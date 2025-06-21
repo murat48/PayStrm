@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Freighter Soroban Test</title>
+    <script src="https://unpkg.com/@stellar/stellar-sdk@12/dist/stellar-sdk.min.js"></script>
+</head>
+<body>
+    <h1>Freighter Soroban Test</h1>
+    <button onclick="testFreighterSoroban()">Test Soroban Contract Call</button>
+    <div id="result"></div>
+
+    <script>
+        async function testFreighterSoroban() {
+            const log = (msg) => {
+                console.log(msg);
+                document.getElementById('result').innerHTML += '<p>' + msg + '</p>';
+            };
+
+            try {
+                log('🔄 Testing Freighter Soroban integration...');
+                
+                // Import Freighter API
+                const { signTransaction, getPublicKey, isConnected } = await import('https://unpkg.com/@stellar/freighter-api@1/dist/index.min.js');
+                
+                // Check connection
+                const connected = await isConnected();
+                log('📊 Freighter connected: ' + connected);
+                
+                if (!connected) {
+                    log('❌ Please connect Freighter wallet first');
+                    return;
+                }
+                
+                // Get public key
+                const publicKey = await getPublicKey();
+                log('👤 Public key: ' + publicKey);
+                
+                // Create Soroban contract transaction
+                const contractAddress = 'CCTSOF3ALAAZHTS3FYLXM6Y7J3EEVVPQMUDCYKOPRDVFIFNWRZXNNYS3';
+                const networkPassphrase = 'Test SDF Network ; September 2015';
+                const rpcUrl = 'https://soroban-testnet.stellar.org';
+                
+                const server = new StellarSdk.SorobanRpc.Server(rpcUrl);
+                const contract = new StellarSdk.Contract(contractAddress);
+                
+                // Get account
+                const account = await server.getAccount(publicKey);
+                log('✅ Account loaded, sequence: ' + account.sequenceNumber());
+                
+                // Prepare arguments
+                const employer = StellarSdk.nativeToScVal(publicKey, { type: 'address' });
+                const employee = StellarSdk.nativeToScVal('GCNA5EMJNXZPO57ARVJYQ5SN2DYYPD6ZCCENQ5AQTMVNKN77RDIPMI3A', { type: 'address' });
+                const amount = StellarSdk.nativeToScVal(1000000000, { type: 'i128' });
+                const duration = StellarSdk.nativeToScVal(2592000, { type: 'u64' });
+                
+                log('✅ Arguments prepared');
+                
+                // Build transaction
+                const transaction = new StellarSdk.TransactionBuilder(account, {
+                    fee: '1000000',
+                    networkPassphrase: networkPassphrase,
+                })
+                .addOperation(contract.call('create_stream', employer, employee, amount, duration))
+                .setTimeout(300)
+                .build();
+                
+                log('🔧 Transaction built');
+                
+                // Simulate transaction
+                const simulation = await server.simulateTransaction(transaction);
+                if (StellarSdk.SorobanRpc.Api.isSimulationError(simulation)) {
+                    log('❌ Simulation failed: ' + simulation.error);
+                    return;
+                }
+                
+                log('✅ Transaction simulated successfully');
+                
+                // Prepare transaction
+                const preparedTx = await server.prepareTransaction(transaction);
+                log('🎯 Transaction prepared for Soroban');
+                
+                const xdr = preparedTx.toXDR();
+                log('📋 XDR ready for signing (length: ' + xdr.length + ')');
+                log('🚨 ŞİMDİ FREIGHTER\'DA "INVOKE HOST FUNCTION" GÖRMELİSİNİZ!');
+                
+                // Sign with Freighter
+                const result = await signTransaction(xdr, { networkPassphrase });
+                log('✅ Transaction signed successfully!');
+                log('📋 Signed XDR length: ' + result.signedTxXdr.length);
+                
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
