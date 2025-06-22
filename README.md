@@ -34,8 +34,6 @@ PayStream revolutionizes traditional payroll and lending systems by enabling **r
 
 ## 🚀 Live Demo
 
-**🌐 Frontend**: [https://paystream.vercel.app](https://paystream.vercel.app)
-
 **🔗 Smart Contracts on Stellar Testnet**:
 
 - **Salary Streaming**: `CAACXYESJLBLSO6YI4Q4PBTQGLUOLDWVRBU6OEP3WHSHCQ7ASPZ66J34`
