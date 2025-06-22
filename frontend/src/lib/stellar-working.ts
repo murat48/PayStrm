@@ -90,6 +90,62 @@ export const buildContractTransactionFreighter = async (
           }
         }
         
+        if (method === 'request_loan') {
+          if (index === 0) { // borrower -> address (handled above)
+            return nativeToScVal(arg, { type: 'address' });
+          }
+          if (index === 1) { // amount -> i128
+            console.log(`  → i128 (amount): ${arg}`);
+            return nativeToScVal(BigInt(arg), { type: 'i128' });
+          }
+          if (index === 2) { // risk_tier -> u32
+            console.log(`  → u32 (risk_tier): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+          if (index === 3) { // collateral_stream_id -> u32
+            console.log(`  → u32 (collateral_stream_id): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+        }
+        
+        if (method === 'approve_loan') {
+          if (index === 0) { // admin -> address (handled above)
+            return nativeToScVal(arg, { type: 'address' });
+          }
+          if (index === 1) { // loan_id -> u32
+            console.log(`  → u32 (loan_id): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+        }
+        
+        if (method === 'reject_loan') {
+          if (index === 0) { // admin -> address (handled above)
+            return nativeToScVal(arg, { type: 'address' });
+          }
+          if (index === 1) { // loan_id -> u32
+            console.log(`  → u32 (loan_id): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+          if (index === 2) { // reason -> string
+            console.log(`  → string (reason): ${arg}`);
+            return nativeToScVal(arg, { type: 'string' });
+          }
+        }
+        
+        if (method === 'repay_loan') {
+          if (index === 0) { // borrower -> address (handled above)
+            return nativeToScVal(arg, { type: 'address' });
+          }
+          if (index === 1) { // loan_id -> u32
+            console.log(`  → u32 (loan_id): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+          if (index === 2) { // amount -> i128
+            console.log(`  → i128 (amount): ${arg}`);
+            return nativeToScVal(BigInt(arg), { type: 'i128' });
+          }
+        }
+        
         // Default: u64 for numbers
         console.log(`  → default u64: ${arg}`);
         return nativeToScVal(arg, { type: 'u64' });
@@ -340,6 +396,62 @@ export const buildContractTransaction = async (
           }
         }
         
+        if (method === 'request_loan') {
+          if (index === 0) { // borrower -> address (handled above)
+            return nativeToScVal(arg, { type: 'address' });
+          }
+          if (index === 1) { // amount -> i128
+            console.log(`  → i128 (amount): ${arg}`);
+            return nativeToScVal(arg, { type: 'i128' });
+          }
+          if (index === 2) { // risk_tier -> u32
+            console.log(`  → u32 (risk_tier): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+          if (index === 3) { // collateral_stream_id -> u32
+            console.log(`  → u32 (collateral_stream_id): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+        }
+        
+        if (method === 'approve_loan') {
+          if (index === 0) { // admin -> address (handled above)
+            return nativeToScVal(arg, { type: 'address' });
+          }
+          if (index === 1) { // loan_id -> u32
+            console.log(`  → u32 (loan_id): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+        }
+        
+        if (method === 'reject_loan') {
+          if (index === 0) { // admin -> address (handled above)
+            return nativeToScVal(arg, { type: 'address' });
+          }
+          if (index === 1) { // loan_id -> u32
+            console.log(`  → u32 (loan_id): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+          if (index === 2) { // reason -> string
+            console.log(`  → string (reason): ${arg}`);
+            return nativeToScVal(arg, { type: 'string' });
+          }
+        }
+        
+        if (method === 'repay_loan') {
+          if (index === 0) { // borrower -> address (handled above)
+            return nativeToScVal(arg, { type: 'address' });
+          }
+          if (index === 1) { // loan_id -> u32
+            console.log(`  → u32 (loan_id): ${arg}`);
+            return nativeToScVal(arg, { type: 'u32' });
+          }
+          if (index === 2) { // amount -> i128
+            console.log(`  → i128 (amount): ${arg}`);
+            return nativeToScVal(arg, { type: 'i128' });
+          }
+        }
+        
         // Stream management methods use u32 for stream_id
         if (method === 'pause_stream' || method === 'resume_stream' || method === 'end_stream' || method === 'get_stream') {
           if (index === 0) { // stream_id -> u32
@@ -359,9 +471,9 @@ export const buildContractTransaction = async (
 
     console.log('\n🏗️ Building Soroban transaction...');
     console.log('🔧 Using contract.call() for proper Soroban formatting');
-    
+    debugger;
     const transaction = new TransactionBuilder(account, {
-      fee: '100', // Much higher fee for Soroban contract calls (1 XLM)
+      fee: '100000', // Much higher fee for Soroban contract calls (1 XLM)
       networkPassphrase: NETWORK_CONFIG.networkPassphrase,
     })
       .addOperation(contract.call(method, ...scArgs))
@@ -402,16 +514,33 @@ export const readContract = async (
   method: string,
   args: any[] = []
 ) => {
+  // Skip on server-side rendering to prevent SSR errors
+  if (typeof window === 'undefined') {
+    console.warn(`readContract called on server-side for method: ${method}. Returning empty result.`);
+    return null;
+  }
+
   try {
     const server = getServer();
-    if (!server) throw new Error('Server not available on server side');
+    if (!server) {
+      console.warn('Server not available, skipping contract read');
+      return null;
+    }
     
     const contract = createContract(contractAddress);
     
     // Convert arguments to ScVal format
-    const scArgs = args.map(arg => {
-      if (typeof arg === 'string') return nativeToScVal(arg, { type: 'address' });
-      if (typeof arg === 'number') return nativeToScVal(arg, { type: 'u64' });
+    const scArgs = args.map((arg, index) => {
+      if (typeof arg === 'string' && arg.length === 56 && arg.startsWith('G')) {
+        return nativeToScVal(arg, { type: 'address' });
+      }
+      if (typeof arg === 'number') {
+        // For specific methods that need u32
+        if (method === 'get_loan' || method === 'get_max_loan_percentage') {
+          return nativeToScVal(arg, { type: 'u32' });
+        }
+        return nativeToScVal(arg, { type: 'u64' });
+      }
       return nativeToScVal(arg);
     });
 
@@ -427,15 +556,33 @@ export const readContract = async (
       .build();
 
     const response = await server.simulateTransaction(transaction);
-    debugger;
+  
     if (rpc.Api.isSimulationSuccess(response)) {
       return scValToNative(response.result!.retval);
     } else {
-      console.error('Contract simulation failed:', response);
-      throw new Error('Contract simulation failed');
+      // Safe error logging for client-side only
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(`Contract simulation failed for method ${method}:`, response);
+      }
+      
+      // Extract error message safely
+      let errorMessage = 'Unknown error';
+      try {
+        if (rpc.Api.isSimulationError(response)) {
+          errorMessage = response.error || 'Simulation error';
+        } else if (response && typeof response === 'object') {
+          errorMessage = (response as any).error || 'Contract simulation failed';
+        }
+      } catch {
+        errorMessage = 'Error parsing simulation response';
+      }
+      
+      throw new Error(`Contract simulation failed: ${errorMessage}`);
     }
   } catch (error) {
-    console.error('Read contract error:', error);
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn(`Read contract error for method ${method}:`, error);
+    }
     throw error;
   }
 };
@@ -592,20 +739,58 @@ export const salaryStreamingMethods = {
 };
 
 export const lendingMethods = {
-  requestLoan: (amount: number, publicKey: string) =>
-    buildContractTransaction(CONTRACT_ADDRESSES.LENDING, 'request_loan', [amount], publicKey),
+  requestLoan: (amount: number, riskTier: number, collateralStreamId: number, publicKey: string) =>
+    buildContractTransaction(CONTRACT_ADDRESSES.LENDING, 'request_loan', [publicKey, amount, riskTier, collateralStreamId], publicKey),
+  
+  approveLoan: (loanId: number, publicKey: string) =>
+    buildContractTransaction(CONTRACT_ADDRESSES.LENDING, 'approve_loan', [publicKey, loanId], publicKey),
+  
+  rejectLoan: (loanId: number,publicKey:string) =>
+    buildContractTransaction(CONTRACT_ADDRESSES.LENDING, 'reject_loan', [publicKey,loanId], publicKey),
   
   getOutstandingLoans: (borrower: string) =>
     readContract(CONTRACT_ADDRESSES.LENDING, 'get_outstanding_loans', [borrower]),
   
+  getBorrowerLoans: (borrower: string) =>
+    readContract(CONTRACT_ADDRESSES.LENDING, 'get_borrower_loans', [borrower]),
+  
   repayLoan: (loanId: number, amount: number, publicKey: string) =>
-    buildContractTransaction(CONTRACT_ADDRESSES.LENDING, 'repay_loan', [loanId, amount], publicKey),
+    buildContractTransaction(CONTRACT_ADDRESSES.LENDING, 'repay_loan', [publicKey, loanId, amount], publicKey),
   
-  calculateMaxLoan: (streamId: number) =>
-    readContract(CONTRACT_ADDRESSES.LENDING, 'calculate_max_loan', [streamId]),
+  getLoan: (loanId: number) =>
+    readContract(CONTRACT_ADDRESSES.LENDING, 'get_loan', [loanId]),
   
-  getLoanDetails: (loanId: number) =>
-    readContract(CONTRACT_ADDRESSES.LENDING, 'get_loan_details', [loanId]),
+  getMaxLoanPercentage: (riskTier: number) =>
+    readContract(CONTRACT_ADDRESSES.LENDING, 'get_max_loan_percentage', [riskTier]),
+  
+  // Admin-only method to get all loans by iterating through loan IDs
+  getAllLoans: async () => {
+    // Skip on server-side rendering
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    const allLoans = [];
+    let loanId = 1;
+    const maxLoans = 1000; // Safety limit to prevent infinite loops
+    
+    while (loanId <= maxLoans) {
+      try {
+        const loan = await readContract(CONTRACT_ADDRESSES.LENDING, 'get_loan', [loanId]);
+        if (loan && loan.id) {
+          allLoans.push(loan);
+        }
+        loanId++;
+      } catch (error) {
+        // When we can't fetch a loan, we've reached the end
+        console.log(`No more loans found after ID ${loanId - 1}`);
+        break;
+      }
+    }
+    
+    console.log(`🔍 Admin: Found ${allLoans.length} total loans in the system`);
+    return allLoans;
+  },
 };
 
 export const workProfileMethods = {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, Play, StopCircle, Clock, TrendingUp, RefreshCw } from 'lucide-react';
-import { salaryStreamingMethods, signAndSubmitTransaction } from '../../lib/stellar-working';
+import { salaryStreamingMethods, lendingMethods, signAndSubmitTransaction } from '../../lib/stellar-working';
 import {
   isConnected,
   isAllowed,
@@ -27,10 +27,43 @@ interface Stream {
   withdrawnAmount: number;
   isActive: boolean;
   isPaused: boolean;
+  pausedAvailableAmount?: number; // Store the available amount when paused
 }
+
+interface Loan {
+  id: number;
+  borrower: string;
+  amount: number;
+  status: 'Pending' | 'Approved' | 'Repaid' | 'Defaulted';
+  riskTier: number;
+  interestRate: number;
+  createdAt: Date;
+  repaidAmount: number;
+  collateralStreamId: number;
+}
+
+// Helper function to convert Soroban enum status to string
+const getStatusString = (status: unknown): 'Pending' | 'Approved' | 'Repaid' | 'Defaulted' => {
+  if (typeof status === 'string') return status as 'Pending' | 'Approved' | 'Repaid' | 'Defaulted';
+  if (typeof status === 'object' && status !== null) {
+    // Soroban enums are returned as objects with a property name matching the variant
+    if ('Pending' in status) return 'Pending';
+    if ('Approved' in status) return 'Approved';
+    if ('Repaid' in status) return 'Repaid';
+    if ('Defaulted' in status) return 'Defaulted';
+    // If it's an array, take the first element as the variant name
+    if (Array.isArray(status) && status.length > 0) {
+      return status[0] as 'Pending' | 'Approved' | 'Repaid' | 'Defaulted';
+    }
+  }
+  // Default fallback
+  return 'Pending';
+};
 
 export default function StreamSection({ publicKey }: StreamSectionProps) {
   const [streams, setStreams] = useState<Stream[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [pausedAvailableAmounts, setPausedAvailableAmounts] = useState<{ [key: number]: number }>({});
   const [freighterStatus, setFreighterStatus] = useState<string>('checking...');
   const [freighterConnected, setFreighterConnected] = useState(false);
   const [freighterAllowed, setFreighterAllowed] = useState(false);
@@ -44,6 +77,23 @@ export default function StreamSection({ publicKey }: StreamSectionProps) {
     amount: '100000000000',
     duration: '30'
   });
+
+  // Lending states
+  const [loanAmount, setLoanAmount] = useState('');
+  const [riskTier, setRiskTier] = useState(3);
+  const [collateralStreamId, setCollateralStreamId] = useState('');
+  const [isRequestingLoan, setIsRequestingLoan] = useState(false);
+  const [isApprovingLoan, setIsApprovingLoan] = useState<number | null>(null);
+  const [isRejectingLoan, setIsRejectingLoan] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showLendingSection, setShowLendingSection] = useState(false);
+  
+  // Repayment states
+  const [repaymentAmounts, setRepaymentAmounts] = useState<{ [key: number]: string }>({});
+  const [isRepayingLoan, setIsRepayingLoan] = useState<number | null>(null);
+
+  // Check if current user is admin
+  const isAdmin = userAddress === 'GALDPLQ62RAX3V7RJE73D3C2F4SKHGCJ3MIYJ4MLU2EAIUXBDSUVS7SA';
 
   // Real mode only - blockchain data
   // Real mode only - no test mode
@@ -72,17 +122,17 @@ export default function StreamSection({ publicKey }: StreamSectionProps) {
         
         // Tüm stream'ları parse et
         if (allStreamData && Array.isArray(allStreamData)) {
-          const parsedStreams = allStreamData.map((stream: any) => ({
-            id: stream.id,
-            employer: stream.employer,
-            employee: stream.employee,
-            totalAmount: parseInt(stream.total_amount) / 10000000, // stroops to XLM
-            ratePerSecond: parseInt(stream.rate_per_second) / 10000000, // stroops/sec to XLM/sec
-            startTime: parseInt(stream.start_time),
-            duration: parseInt(stream.duration_seconds),
-            withdrawnAmount: parseInt(stream.withdrawn_amount) / 10000000, // stroops to XLM
-            isActive: stream.is_active,
-            isPaused: stream.is_paused
+          const parsedStreams = allStreamData.map((stream: Record<string, unknown>) => ({
+            id: stream.id as number,
+            employer: stream.employer as string,
+            employee: stream.employee as string,
+            totalAmount: parseInt(stream.total_amount as string) / 10000000, // stroops to XLM
+            ratePerSecond: parseInt(stream.rate_per_second as string) / 10000000, // stroops/sec to XLM/sec
+            startTime: parseInt(stream.start_time as string),
+            duration: parseInt(stream.duration_seconds as string),
+            withdrawnAmount: parseInt(stream.withdrawn_amount as string) / 10000000, // stroops to XLM
+            isActive: stream.is_active as boolean,
+            isPaused: stream.is_paused as boolean
           }));
           
           // Filter streams: only show streams where current user is employee or employer
@@ -127,6 +177,7 @@ export default function StreamSection({ publicKey }: StreamSectionProps) {
     // Clear any existing state on component mount
     setStreams([]);
     setWithdrawAmounts({});
+    setPausedAvailableAmounts({});
     
     const checkFreighterStep = async () => {
       try {
@@ -485,8 +536,51 @@ const xdr = await salaryStreamingMethods.withdraw(streamId, amountInStroops, pub
 
 
   const getAvailableAmount = (stream: Stream): number => {
-    if (!stream.isActive || stream.isPaused) {
-      return 0; // Paused or inactive streams have no available amount
+    // Inactive streams have no available amount
+    if (!stream.isActive) {
+      return 0;
+    }
+    
+    // For paused streams, return the frozen available amount
+    if (stream.isPaused) {
+      // If we have a stored paused amount for this stream, use it
+      const storedPausedAmount = pausedAvailableAmounts[stream.id];
+      if (storedPausedAmount !== undefined) {
+        console.log(`📊 Available Amount Debug - PAUSED (Stream ${stream.id}):`);
+        console.log(`  Stream status: Active=${stream.isActive}, Paused=${stream.isPaused}`);
+        console.log(`  Frozen available: ${storedPausedAmount.toFixed(2)} XLM`);
+        return storedPausedAmount;
+      }
+      
+      // If no stored amount, calculate current available and store it
+      const now = Math.floor(Date.now() / 1000);
+      const elapsed = Math.max(0, now - stream.startTime);
+      const earnedXLM = elapsed * stream.ratePerSecond;
+      const totalXLM = stream.totalAmount;
+      const withdrawnXLM = stream.withdrawnAmount;
+      const earned = Math.min(earnedXLM, totalXLM);
+      const currentAvailable = Math.max(0, earned - withdrawnXLM);
+      
+      // Store this amount for future use
+      setPausedAvailableAmounts(prev => ({
+        ...prev,
+        [stream.id]: currentAvailable
+      }));
+      
+      console.log(`📊 Available Amount Debug - NEWLY PAUSED (Stream ${stream.id}):`);
+      console.log(`  Stream status: Active=${stream.isActive}, Paused=${stream.isPaused}`);
+      console.log(`  Calculated and frozen available: ${currentAvailable.toFixed(2)} XLM`);
+      
+      return currentAvailable;
+    }
+    
+    // For active (non-paused) streams, calculate normally and clear any stored paused amount
+    if (pausedAvailableAmounts[stream.id] !== undefined) {
+      setPausedAvailableAmounts(prev => {
+        const newAmounts = { ...prev };
+        delete newAmounts[stream.id];
+        return newAmounts;
+      });
     }
     
     const now = Math.floor(Date.now() / 1000);
@@ -500,8 +594,9 @@ const xdr = await salaryStreamingMethods.withdraw(streamId, amountInStroops, pub
     const earned = Math.min(earnedXLM, totalXLM);
     const available = Math.max(0, earned - withdrawnXLM);
     
-    // Debug logging
-    console.log(`📊 Available Amount Debug (Stream ${stream.id}):`);
+    // Debug logging for active streams
+    console.log(`📊 Available Amount Debug - ACTIVE (Stream ${stream.id}):`);
+    console.log(`  Stream status: Active=${stream.isActive}, Paused=${stream.isPaused}`);
     console.log(`  Current time: ${now}`);
     console.log(`  Stream start: ${stream.startTime}`);
     console.log(`  Elapsed: ${elapsed} seconds`);
@@ -524,81 +619,626 @@ const xdr = await salaryStreamingMethods.withdraw(streamId, amountInStroops, pub
     return `${mins}m`;
   };
 
+  // Load loans function
+  const loadLoans = useCallback(async () => {
+    if (!userAddress) {
+      console.log('🔍 User address not available yet, skipping loan load');
+      return;
+    }
+    
+    try {
+      console.log('🌐 Loading loans...');
+      
+      let allLoans: Loan[] = [];
+      
+      if (isAdmin) {
+        // Admin can see all loans (no personal loans)
+        console.log('👑 Admin loading all loans for management...');
+        const allLoanData = await lendingMethods.getAllLoans();
+        console.log('✅ All loans loaded:', allLoanData);
+        
+        if (allLoanData && Array.isArray(allLoanData)) {
+          allLoans = allLoanData.map((loan: Record<string, unknown>) => ({
+            id: loan.id as number,
+            borrower: loan.borrower as string,
+            amount: parseInt(loan.amount as string) / 10000000, // stroops to XLM
+            status: getStatusString(loan.status),
+            riskTier: loan.risk_tier as number,
+            interestRate: loan.interest_rate as number,
+            createdAt: new Date(parseInt(loan.created_at as string) * 1000),
+            repaidAmount: parseInt(loan.repaid_amount as string) / 10000000, // stroops to XLM
+            collateralStreamId: loan.collateral_stream_id as number
+          }));
+        }
+      } else {
+        // Regular users can only see their own loans
+        console.log('👤 User loading own loans...');
+        const userLoanIds = await lendingMethods.getBorrowerLoans(userAddress);
+        console.log('✅ User loan IDs:', userLoanIds);
+        
+        if (userLoanIds && Array.isArray(userLoanIds)) {
+          for (const loanId of userLoanIds) {
+            try {
+              const loan = await lendingMethods.getLoan(loanId);
+              if (loan) {
+                allLoans.push({
+                  id: loan.id,
+                  borrower: loan.borrower,
+                  amount: parseInt(loan.amount) / 10000000, // stroops to XLM
+                  status: getStatusString(loan.status),
+                  riskTier: loan.risk_tier,
+                  interestRate: loan.interest_rate,
+                  createdAt: new Date(parseInt(loan.created_at) * 1000),
+                  repaidAmount: parseInt(loan.repaid_amount) / 10000000, // stroops to XLM
+                  collateralStreamId: loan.collateral_stream_id
+                });
+              }
+            } catch (error) {
+              console.error(`Failed to load loan ${loanId}:`, error);
+            }
+          }
+        }
+      }
+      
+      console.log('✅ Total loans loaded:', allLoans);
+      setLoans(allLoans);
+      
+    } catch (error) {
+      console.error('❌ Failed to load loans:', error);
+      setLoans([]);
+    }
+  }, [userAddress, isAdmin]);
+
+  useEffect(() => {
+    loadLoans();
+  }, [loadLoans]);
+
+  // Auto-select first available stream as collateral when streams load
+  useEffect(() => {
+    if (!isAdmin && streams.length > 0 && !collateralStreamId) {
+      const eligibleStreams = streams.filter(stream => 
+        stream.employee === userAddress && 
+        stream.isActive && 
+        !stream.isPaused
+      );
+      
+      if (eligibleStreams.length > 0) {
+        console.log('🎯 Auto-selecting collateral stream:', eligibleStreams[0].id);
+        setCollateralStreamId(eligibleStreams[0].id.toString());
+      }
+    }
+  }, [streams, userAddress, isAdmin, collateralStreamId]);
+
+  // Lending functions
+  const requestLoan = async () => {
+    if (!loanAmount || !collateralStreamId) {
+      alert('Please fill all fields');
+      return;
+    }
+
+    setIsRequestingLoan(true);
+    try {
+      const amountInStroops = parseFloat(loanAmount) * 10000000;
+      const streamId = parseInt(collateralStreamId);
+
+      const xdr = await lendingMethods.requestLoan(
+        amountInStroops,
+        riskTier,
+        streamId,
+        userAddress
+      );
+
+      if (xdr) {
+        await signAndSubmitTransaction(xdr);
+        alert(`✅ Loan request submitted!\n\n💰 Amount: ${loanAmount} XLM\n📊 Risk Tier: ${riskTier}\n🔗 Collateral Stream: ${streamId}`);
+        
+        // Clear form
+        setLoanAmount('');
+        setCollateralStreamId('');
+        
+        // Reload loans
+        await loadLoans();
+      }
+    } catch (error) {
+      console.error('Failed to request loan:', error);
+      alert('Failed to request loan. Please try again.');
+    } finally {
+      setIsRequestingLoan(false);
+    }
+  };
+
+  const approveLoan = async (loanId: number) => {
+    if (!isAdmin) {
+      alert('Only admin can approve loans');
+      return;
+    }
+
+    setIsApprovingLoan(loanId);
+    try {
+      const xdr = await lendingMethods.approveLoan(loanId, userAddress);
+
+      if (xdr) {
+        await signAndSubmitTransaction(xdr);
+        alert(`✅ Loan ${loanId} approved successfully!`);
+        
+        // Reload loans
+        await loadLoans();
+      }
+    } catch (error) {
+      console.error('Failed to approve loan:', error);
+      alert('Failed to approve loan: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsApprovingLoan(null);
+    }
+  };
+
+  const rejectLoan = async (loanId: number) => {
+    if (!isAdmin) {
+      alert('Only admin can reject loans');
+      return;
+    }
+
+    const reason = rejectReason.trim();
+    if (!reason) {
+      alert('Please enter a rejection reason');
+      return;
+    }
+
+    setIsRejectingLoan(loanId);
+    try {
+      // const xdr = await lendingMethods.rejectLoan(loanId, reason, userAddress);
+const xdr = await lendingMethods.rejectLoan(loanId,publicKey);
+      if (xdr) {
+        await signAndSubmitTransaction(xdr);
+        alert(`✅ Loan ${loanId} rejected successfully!\n\nReason: ${reason}`);
+        
+        // Clear reject reason
+        setRejectReason('');
+        
+        // Reload loans
+        await loadLoans();
+      }
+    } catch (error) {
+      console.error('Failed to reject loan:', error);
+      alert('Failed to reject loan: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsRejectingLoan(null);
+    }
+  };
+
+  const repayLoan = async (loanId: number) => {
+    const repaymentAmount = repaymentAmounts[loanId];
+    if (!repaymentAmount || parseFloat(repaymentAmount) <= 0) {
+      alert('Please enter a valid repayment amount');
+      return;
+    }
+
+    setIsRepayingLoan(loanId);
+    try {
+      const amountInStroops = parseFloat(repaymentAmount) * 10000000; // XLM to stroops
+
+      const xdr = await lendingMethods.repayLoan(loanId, amountInStroops, userAddress);
+
+      if (xdr) {
+        await signAndSubmitTransaction(xdr);
+        alert(`✅ Loan repayment successful!\n\n💰 Amount: ${repaymentAmount} XLM\n🆔 Loan ID: ${loanId}`);
+        
+        // Clear repayment amount
+        setRepaymentAmounts(prev => ({
+          ...prev,
+          [loanId]: ''
+        }));
+        
+        // Reload loans
+        await loadLoans();
+      }
+    } catch (error) {
+      console.error('Failed to repay loan:', error);
+      alert('Failed to repay loan: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsRepayingLoan(null);
+    }
+  };
+
+  const repayFullLoan = async (loanId: number, remainingAmount: number) => {
+    setIsRepayingLoan(loanId);
+    try {
+      const amountInStroops = remainingAmount * 10000000; // XLM to stroops
+
+      const xdr = await lendingMethods.repayLoan(loanId, amountInStroops, userAddress);
+
+      if (xdr) {
+        await signAndSubmitTransaction(xdr);
+        alert(`✅ Loan fully repaid!\n\n💰 Amount: ${remainingAmount.toFixed(2)} XLM\n🆔 Loan ID: ${loanId}\n🎉 Loan is now REPAID!`);
+        
+        // Clear repayment amount
+        setRepaymentAmounts(prev => ({
+          ...prev,
+          [loanId]: ''
+        }));
+        
+        // Reload loans
+        await loadLoans();
+      }
+    } catch (error) {
+      console.error('Failed to repay loan:', error);
+      alert('Failed to repay loan: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsRepayingLoan(null);
+    }
+  };
+
   // Stream kategorileri
   const activeStreams = streams.filter(s => s.isActive && !s.isPaused);
   const pausedStreams = streams.filter(s => s.isActive && s.isPaused);
   const inactiveStreams = streams.filter(s => !s.isActive);
 
+  // Loan kategorileri
+  const pendingLoans = loans.filter(l => l.status === 'Pending');
+  const approvedLoans = loans.filter(l => l.status === 'Approved');
+  const repaidLoans = loans.filter(l => l.status === 'Repaid');
+  const defaultedLoans = loans.filter(l => l.status === 'Defaulted');
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-            <DollarSign className="mr-3 text-green-600" />
-            Salary Streaming
-          </h2>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setShowLendingSection(!showLendingSection)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                showLendingSection 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              💰 Lending {showLendingSection ? '(Active)' : ''}
+            </button>
+            <span className="text-sm text-gray-500">
+              {isAdmin ? '👑 Admin Panel' : '👤 User Panel'}
+            </span>
+          </div>
           
-          {/* Freighter Status Panel - FreighterWalletDocs.md style */}
-          <div className="bg-gray-50 rounded-lg p-4 min-w-96">
-            <div className="text-sm space-y-2">
-              <div className="flex justify-between">
-                <span className="font-medium">Wallet Status:</span> 
-                <span>{freighterStatus}</span>
-              </div>
-              
-              {freighterConnected && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="font-medium">Connected:</span> 
-                    <span className="text-green-600">✅ Yes</span>
-                  </div>
-                  
-                  {freighterAllowed && userAddress && (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="font-medium">Address:</span> 
-                        <span className="font-mono text-xs">{userAddress.substring(0, 12)}...</span>
-                      </div>
-                      
-                      {networkInfo && (
-                        <div className="flex justify-between">
-                          <span className="font-medium">Network:</span> 
-                          <span className="text-blue-600">{networkInfo.network || 'Unknown'}</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </>
+          <div className="flex items-center space-x-2 ml-auto">
+            {!freighterAllowed && freighterConnected && (
+                <button
+                  onClick={requestFreighterAccess}
+                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Request Access
+                </button>
               )}
               
-              <div className="flex items-center space-x-2">
-                {!freighterAllowed && freighterConnected && (
-                    <button
-                      onClick={requestFreighterAccess}
-                      className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                      Request Access
-                    </button>
-                  )}
-                  
-                  <button
-                    onClick={() => {
-                      window.location.reload();
-                      // Real-time refresh
-                      setTimeout(() => {
-                        loadStreams();
-                      }, 100);
-                    }}
-                    className="p-1 text-gray-600 hover:text-blue-600 rounded"
-                    title="Refresh streams and balances"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
+              <button
+                onClick={() => {
+                  window.location.reload();
+                  // Real-time refresh
+                  setTimeout(() => {
+                    loadStreams();
+                    loadLoans();
+                  }, 100);
+                }}
+                className="p-1 text-gray-600 hover:text-blue-600 rounded"
+                title="Refresh streams and balances"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+        </div>
+
+        {/* Lending Section */}
+        {showLendingSection && (
+          <div className="mb-8 p-6 bg-purple-50 rounded-lg border border-purple-200">
+            <div className="mb-6">
+              <h3 className="text-xl font-bold text-purple-900">
+                {isAdmin ? '👑 Admin Lending Dashboard' : '💰 Lending Platform'}
+              </h3>
+              {isAdmin && (
+                <p className="text-sm text-purple-700 mt-1">
+                  Manage loan applications, approve/reject requests, and monitor repayments
+                </p>
+              )}
+            </div>
+            
+            {/* Loan Overview */}
+            {loans.length > 0 && (
+              <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                  <div className="flex items-center">
+                    <div className="bg-yellow-100 p-2 rounded-lg">
+                      <Clock className="w-6 h-6 text-yellow-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-yellow-600">Pending Loans</p>
+                      <p className="text-2xl font-semibold text-yellow-900">{pendingLoans.length}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <div className="flex items-center">
+                    <div className="bg-green-100 p-2 rounded-lg">
+                      <DollarSign className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-green-600">Approved Loans</p>
+                      <p className="text-2xl font-semibold text-green-900">{approvedLoans.length}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-center">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <TrendingUp className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-blue-600">Repaid Loans</p>
+                      <p className="text-2xl font-semibold text-blue-900">{repaidLoans.length}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                  <div className="flex items-center">
+                    <div className="bg-red-100 p-2 rounded-lg">
+                      <StopCircle className="w-6 h-6 text-red-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-red-600">Defaulted</p>
+                      <p className="text-2xl font-semibold text-red-900">{defaultedLoans.length}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* Request Loan Form - Only for regular users */}
+            {!isAdmin && (
+              <div className="mb-8 p-4 bg-white rounded-lg border">
+                <h4 className="text-lg font-semibold mb-4">📝 Request New Loan</h4>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                  <input
+                    type="number"
+                    placeholder="Loan Amount (XLM)"
+                    value={loanAmount}
+                    onChange={(e) => setLoanAmount(e.target.value)}
+                    className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                  <select
+                    value={riskTier}
+                    onChange={(e) => setRiskTier(parseInt(e.target.value))}
+                    className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value={1}>Risk Tier 1 (4.0% APR)</option>
+                    <option value={2}>Risk Tier 2 (4.5% APR)</option>
+                    <option value={3}>Risk Tier 3 (5.0% APR)</option>
+                    <option value={4}>Risk Tier 4 (5.5% APR)</option>
+                    <option value={5}>Risk Tier 5 (6.0% APR)</option>
+                  </select>
+                  <select
+                    value={collateralStreamId}
+                    onChange={(e) => setCollateralStreamId(e.target.value)}
+                    className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="">Select Collateral Stream</option>
+                    {streams
+                      .filter(stream => 
+                        stream.employee === userAddress && 
+                        stream.isActive && 
+                        !stream.isPaused
+                      )
+                      .map(stream => (
+                        <option key={stream.id} value={stream.id.toString()}>
+                          Stream #{stream.id} - {stream.totalAmount.toFixed(2)} XLM 
+                          ({((stream.withdrawnAmount / stream.totalAmount) * 100).toFixed(1)}% withdrawn)
+                        </option>
+                      ))
+                    }
+                    {streams.filter(stream => 
+                      stream.employee === userAddress && 
+                      stream.isActive && 
+                      !stream.isPaused
+                    ).length === 0 && (
+                      <option value="" disabled>No active streams available</option>
+                    )}
+                  </select>
+                  <button
+                    onClick={requestLoan}
+                    disabled={isRequestingLoan}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {isRequestingLoan ? 'Requesting...' : 'Request Loan'}
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600">
+                  💡 Tip: Select one of your active streams as collateral. Only active, non-paused streams can be used. Higher risk tiers have higher interest rates.
+                </p>
+              </div>
+            )}
+
+            {/* Loans List */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-semibold text-purple-700">
+                  {isAdmin ? '👑 Loan Management Dashboard' : '👤 Your Loans'}
+                </h4>
+                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-lg text-sm">
+                  {loans.length} {isAdmin ? 'total loans' : 'your loans'}
+                </span>
+              </div>
+
+              {loans.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">
+                    {isAdmin 
+                      ? "📋 No loan applications yet. Users can request loans using their salary streams as collateral." 
+                      : "📝 No loans found. Request a new loan using your active streams as collateral."
+                    }
+                  </p>
+                </div>
+              ) : (
+                loans.map((loan) => (
+                  <div key={loan.id} className={`border rounded-lg p-4 ${
+                    loan.status === 'Pending' ? 'bg-yellow-50 border-yellow-200' :
+                    loan.status === 'Approved' ? 'bg-green-50 border-green-200' :
+                    loan.status === 'Repaid' ? 'bg-blue-50 border-blue-200' :
+                    'bg-red-50 border-red-200'
+                  }`}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <h5 className="font-semibold text-gray-900">Loan #{loan.id}</h5>
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            loan.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                            loan.status === 'Approved' ? 'bg-green-100 text-green-800' :
+                            loan.status === 'Repaid' ? 'bg-blue-100 text-blue-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {loan.status === 'Pending' ? '⏳ Pending' :
+                             loan.status === 'Approved' ? '✅ Approved' :
+                             loan.status === 'Repaid' ? '💚 Repaid' :
+                             '❌ Defaulted'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600">Borrower: {loan.borrower}</p>
+                        <p className="text-sm text-gray-600">Amount: {loan.amount.toFixed(2)} XLM</p>
+                        <p className="text-sm text-gray-600">Risk Tier: {loan.riskTier} ({(loan.interestRate / 100).toFixed(1)}% APR)</p>
+                        <p className="text-sm text-gray-600">Collateral Stream: #{loan.collateralStreamId}</p>
+                      </div>
+                      
+                      <div>
+                        <div className="bg-white p-3 rounded-lg space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Requested:</span>
+                            <span className="font-semibold">{loan.amount.toFixed(2)} XLM</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Repaid:</span>
+                            <span className="font-medium text-blue-600">{loan.repaidAmount.toFixed(2)} XLM</span>
+                          </div>
+                          <div className="flex justify-between text-sm border-t pt-1">
+                            <span className="text-gray-600">Remaining:</span>
+                            <span className="font-medium text-gray-900">{(loan.amount - loan.repaidAmount).toFixed(2)} XLM</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Created:</span>
+                            <span className="text-xs text-gray-500">{loan.createdAt.toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        {/* Admin Controls - Only for pending loans from OTHER users */}
+                        {isAdmin && loan.status === 'Pending' && loan.borrower !== userAddress && (
+                          <div className="mt-3 space-y-2">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => approveLoan(loan.id)}
+                                disabled={isApprovingLoan === loan.id}
+                                className="flex-1 bg-green-600 text-white px-3 py-1 text-sm rounded hover:bg-green-700 disabled:opacity-50"
+                              >
+                                {isApprovingLoan === loan.id ? 'Approving...' : '✅ Approve'}
+                              </button>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="Rejection reason..."
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                className="flex-1 px-2 py-1 text-sm border rounded"
+                              />
+                              <button
+                                onClick={() => rejectLoan(loan.id)}
+                                disabled={isRejectingLoan === loan.id || !rejectReason.trim()}
+                                className="bg-red-600 text-white px-3 py-1 text-sm rounded hover:bg-red-700 disabled:opacity-50"
+                              >
+                                {isRejectingLoan === loan.id ? 'Rejecting...' : '❌ Reject'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Note for admin's own loans (if any) */}
+                        {isAdmin && loan.borrower === userAddress && (
+                          <div className="mt-3 p-2 bg-gray-100 border border-gray-300 rounded-lg">
+                            <p className="text-sm text-gray-600">
+                              👤 This is your personal loan. Switch to user mode to manage it.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Status Messages */}
+                        {loan.status === 'Pending' && !isAdmin && (
+                          <div className="mt-3 p-2 bg-yellow-100 border border-yellow-300 rounded-lg">
+                            <p className="text-sm text-yellow-700">
+                              ⏳ Loan is pending admin approval. Please wait for review.
+                            </p>
+                          </div>
+                        )}
+
+                        {loan.status === 'Approved' && (
+                          <div className="mt-3 space-y-3">
+                            <div className="p-2 bg-green-100 border border-green-300 rounded-lg">
+                              <p className="text-sm text-green-700">
+                                ✅ Loan approved! You can start using the funds.
+                              </p>
+                            </div>
+                            
+                            {/* Repayment Controls - Only for borrower */}
+                            {loan.borrower === userAddress && (loan.amount - loan.repaidAmount) > 0 && (
+                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <h6 className="text-sm font-semibold text-blue-800 mb-2">💳 Repay Loan</h6>
+                                <div className="space-y-2">
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="number"
+                                      placeholder="Amount (XLM)"
+                                      step="0.1"
+                                      min="0.1"
+                                      max={(loan.amount - loan.repaidAmount).toFixed(2)}
+                                      value={repaymentAmounts[loan.id] || ''}
+                                      onChange={(e) => setRepaymentAmounts(prev => ({
+                                        ...prev,
+                                        [loan.id]: e.target.value
+                                      }))}
+                                      className="flex-1 px-2 py-1 text-sm border rounded"
+                                    />
+                                    <button
+                                      onClick={() => repayLoan(loan.id)}
+                                      disabled={isRepayingLoan === loan.id || !repaymentAmounts[loan.id]}
+                                      className="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                      {isRepayingLoan === loan.id ? 'Paying...' : '💳 Repay'}
+                                    </button>
+                                  </div>
+                                  
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => repayFullLoan(loan.id, loan.amount - loan.repaidAmount)}
+                                      disabled={isRepayingLoan === loan.id}
+                                      className="flex-1 bg-green-600 text-white px-3 py-1 text-sm rounded hover:bg-green-700 disabled:opacity-50"
+                                    >
+                                      {isRepayingLoan === loan.id ? 'Processing...' : `💰 Pay Full (${(loan.amount - loan.repaidAmount).toFixed(2)} XLM)`}
+                                    </button>
+                                  </div>
+                                  
+                                  <p className="text-xs text-blue-600">
+                                    💡 Remaining: {(loan.amount - loan.repaidAmount).toFixed(2)} XLM
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {loan.status === 'Repaid' && (
+                          <div className="mt-3 p-2 bg-blue-100 border border-blue-300 rounded-lg">
+                ))
+              )}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Streams Overview */}
         {streams.length > 0 && (
@@ -792,8 +1432,8 @@ const xdr = await salaryStreamingMethods.withdraw(streamId, amountInStroops, pub
                         </div>
                       </div>
                       
-                      {/* Withdraw Controls - Only for employees and NOT for special address */}
-                      {stream.employee === publicKey && userAddress !== 'GALDPLQ62RAX3V7RJE73D3C2F4SKHGCJ3MIYJ4MLU2EAIUXBDSUVS7SA' && (
+                      {/* Withdraw Controls - Only for employees, NOT for special address, and NOT for paused streams */}
+                      {stream.employee === publicKey && userAddress !== 'GALDPLQ62RAX3V7RJE73D3C2F4SKHGCJ3MIYJ4MLU2EAIUXBDSUVS7SA' && !stream.isPaused && (
                         <div className="mt-3 space-y-2">
                           <div className="flex gap-2">
                             <input
@@ -824,6 +1464,15 @@ const xdr = await salaryStreamingMethods.withdraw(streamId, amountInStroops, pub
                           >
                             Withdraw All Available
                           </button>
+                        </div>
+                      )}
+                      
+                      {/* Paused stream withdrawal message */}
+                      {stream.employee === publicKey && stream.isPaused && userAddress !== 'GALDPLQ62RAX3V7RJE73D3C2F4SKHGCJ3MIYJ4MLU2EAIUXBDSUVS7SA' && (
+                        <div className="mt-3 p-2 bg-yellow-100 border border-yellow-300 rounded-lg">
+                          <p className="text-sm text-yellow-700">
+                            ⏸️ Stream is paused. Available funds shown but withdrawals are disabled. Ask your employer to resume the stream.
+                          </p>
                         </div>
                       )}
                       
@@ -969,7 +1618,6 @@ const xdr = await salaryStreamingMethods.withdraw(streamId, amountInStroops, pub
               </span>
             </div>
             {inactiveStreams.map((stream) => {
-              const available = getAvailableAmount(stream);
               const progress = (stream.withdrawnAmount / stream.totalAmount) * 100;
 
               return (
@@ -1030,6 +1678,6 @@ const xdr = await salaryStreamingMethods.withdraw(streamId, amountInStroops, pub
           </div>
         )}
       </div>
- 
+    </div>
   );
 }

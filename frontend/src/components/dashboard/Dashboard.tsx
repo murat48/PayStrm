@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import StreamSection from '@/components/stream/StreamSection';
+import StreamSection from '@/components/stream/StreamSections';
 import LendingSection from '@/components/lending/LendingSection';
 import ProfileSection from '@/components/profile/ProfileSection';
 import { DollarSign, CreditCard, User } from 'lucide-react';
 
-type TabType = 'stream' | 'lending' | 'profile';
+type TabType = 'stream' | 'lending';
 
 interface DashboardProps {
   publicKey: string;
@@ -18,7 +18,7 @@ export default function Dashboard({ publicKey }: DashboardProps) {
   const tabs = [
     { id: 'stream' as TabType, name: 'Salary Streaming', icon: DollarSign },
     { id: 'lending' as TabType, name: 'Lending', icon: CreditCard },
-    { id: 'profile' as TabType, name: 'Profile', icon: User },
+    // { id: 'profile' as TabType, name: 'Profile', icon: User },
   ];
 
   return (
@@ -67,7 +67,7 @@ export default function Dashboard({ publicKey }: DashboardProps) {
       <div className="space-y-6">
         {activeTab === 'stream' && <StreamSection publicKey={publicKey} />}
         {activeTab === 'lending' && <LendingSection publicKey={publicKey} />}
-        {activeTab === 'profile' && <ProfileSection publicKey={publicKey} />}
+        {/* {activeTab === 'profile' && <ProfileSection publicKey={publicKey} />} */}
       </div>
     </div>
   );
