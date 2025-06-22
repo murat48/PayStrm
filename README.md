@@ -1,156 +1,241 @@
-# 🚀 Stellar Salary Streaming Platform
+# 🚀 Stellar Salary Streaming & Lending Platform
 
-A decentralized salary streaming platform built on Stellar/Soroban blockchain that enables real-time salary payments with lending capabilities.
+A comprehensive DeFi platform built on Stellar blockchain that enables real-time salary streaming and collateralized lending using active salary streams as collateral.
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Smart Contracts](#smart-contracts)
-- [Frontend Structure](#frontend-structure)
-- [API Reference](#api-reference)
-- [Security](#security)
-- [Contributing](#contributing)
-- [License](#license)
-
-## 🎯 Overview
-
-This platform revolutionizes traditional payroll systems by enabling continuous, real-time salary streaming on the Stellar blockchain. Employees receive their earnings as they work, rather than waiting for monthly paychecks. The system also includes a lending feature that allows employees to borrow against their future earnings.
-
-### Key Benefits
-
-- **Real-time Payments**: Employees get paid every second they work
-- **No Waiting Periods**: Access to earned money immediately
-- **Transparent**: All transactions are recorded on the blockchain
-- **Lending Against Future Earnings**: Borrow money based on salary streams
-- **Low Fees**: Stellar's low transaction costs
-- **Decentralized**: No central authority controlling payments
-
-## ✨ Features
+## 🌟 Features
 
 ### 💰 Salary Streaming
-- Create continuous payment streams for employees
-- Real-time balance calculations
-- Partial and full withdrawals
-- Stream management (pause, resume, end)
-- Multi-stream support per employee
+- **Real-time Payments**: Stream salaries continuously instead of monthly bulk payments
+- **Flexible Withdrawals**: Employees can withdraw earned amounts anytime
+- **Employer Controls**: Pause, resume, or end streams as needed
+- **Transparent Tracking**: Real-time visualization of earnings and withdrawals
+- **Multi-stream Support**: Manage multiple salary streams per employee
 
-### 🏦 Lending System
-- Borrow against future salary streams
-- Automatic loan calculations based on stream value
-- Interest rate management
-- Repayment tracking
-- Credit scoring based on work history
+### 🏦 Collateralized Lending
+- **Stream-backed Loans**: Use active salary streams as collateral
+- **Risk-based Tiers**: 5-tier risk assessment system (1-5)
+- **Competitive Rates**: 4.0% - 6.0% APR based on risk tier
+- **Admin Dashboard**: Comprehensive loan management interface
+- **Flexible Repayment**: Partial or full loan repayments
+- **Automated Risk Assessment**: AI-powered credit scoring
 
 ### 👤 Work Profile Management
+- **Experience Tracking**: Years of experience and job stability metrics
+- **Risk Assessment**: Automated risk scoring algorithm
+- **Sector Classification**: Industry-specific risk evaluation
+- **Profile Updates**: Real-time risk tier recalculation
+- **Employment History**: Track job changes and stability
+
+## 🏗️ Technical Architecture
+
+### Smart Contracts (Rust/Soroban)
+- **Salary Streaming Contract**: `CAACXYESJLBLSO6YI4Q4PBTQGLUOLDWVRBU6OEP3WHSHCQ7ASPZ66J34`
+- **Lending Contract**: `CCEM6DMMVFLPJHZIDN5TM3SPQPZKYPBMXE4HN3HFRZILF3MJQ4I76VUR`
+- **Work Profile Contract**: `CCAHTMF7PDOB2KM4SIDDHBW2AMVGEWCTLKG3BSYJNTFGMASSGMKO6OKT`
+
+### Frontend Stack
+- **Framework**: Next.js 15.3.3 with React 19
+- **Styling**: Tailwind CSS 4.0 with responsive design
+- **Wallet Integration**: Freighter Wallet API v4.1.0
+- **State Management**: React Hooks with TypeScript
+- **UI Components**: Lucide React icons
+- **Build Tool**: TypeScript 5 with ESLint
+
+### Blockchain Configuration
+- **Network**: Stellar Testnet
+- **RPC URL**: `https://soroban-testnet.stellar.org:443`
+- **Network Passphrase**: `Test SDF Network ; September 2015`
+- **Asset**: Native XLM (Stellar Lumens)
 - Professional work history on-chain
-- Experience verification
-- Skill tracking
-- Reputation system
+## 🚀 Getting Started
 
-### 🔐 Security Features
-- Freighter wallet integration
-- Multi-signature support
-- Role-based access control
-- Admin-only stream creation
-- Employee-only withdrawals
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │  Smart Contracts │    │   Stellar       │
-│   (Next.js)     │◄──►│   (Soroban)     │◄──►│   Network       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-        │                       │                       │
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Freighter      │    │  Contract State │    │  XLM Ledger     │
-│  Wallet         │    │  & Logic        │    │  & Transactions │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-### Technology Stack
-
-- **Frontend**: Next.js 14, TypeScript, Tailwind CSS
-- **Blockchain**: Stellar Network, Soroban Smart Contracts
-- **Wallet**: Freighter Browser Extension
-- **Smart Contracts**: Rust (Soroban SDK)
-- **Development**: Node.js, Cargo
-
-## 📋 Prerequisites
-
-Before running this project, ensure you have:
-
-### Software Requirements
-- **Node.js** (v18 or higher)
-- **Rust** (latest stable)
-- **Stellar CLI** (latest version)
+### Prerequisites
+- **Node.js 18+** for frontend development
+- **Rust & Cargo** for smart contract development
+- **Stellar CLI** for contract deployment
 - **Freighter Wallet** browser extension
 
-### Blockchain Requirements
-- Stellar account with XLM for fees
-- Access to Stellar Testnet or Mainnet
-- Deployed smart contracts (addresses configured)
+### Installation
 
-### Browser Setup
-1. Install [Freighter Wallet](https://freighter.app/)
-2. Create or import a Stellar account
-3. Fund account with XLM (testnet faucet available)
-
-## 🚀 Installation
-
-### 1. Clone the Repository
+1. **Clone the repository**
 ```bash
 git clone <repository-url>
-cd stellar-salary-streaming
+cd b
 ```
 
-### 2. Install Dependencies
-
-#### Frontend Dependencies
+2. **Install frontend dependencies**
 ```bash
 cd frontend
 npm install
 ```
 
-#### Smart Contract Dependencies
+3. **Install contract dependencies**
 ```bash
 cd contracts
-cargo build
+cargo check
 ```
 
-### 3. Smart Contract Deployment
-
-#### Deploy Salary Streaming Contract
-```bash
-cd contracts/salary-streaming
-stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/salary_streaming.wasm \
-  --source-account <YOUR_ACCOUNT> \
-  --network testnet
+4. **Environment Setup**
+Create `.env.local` in the frontend directory:
+```env
+NEXT_PUBLIC_ENVIRONMENT=testnet
+NEXT_PUBLIC_STELLAR_NETWORK_PASSPHRASE=Test SDF Network ; September 2015
+NEXT_PUBLIC_STELLAR_RPC_URL=https://soroban-testnet.stellar.org:443
+NEXT_PUBLIC_SALARY_STREAMING_CONTRACT_ID=CAACXYESJLBLSO6YI4Q4PBTQGLUOLDWVRBU6OEP3WHSHCQ7ASPZ66J34
+NEXT_PUBLIC_LENDING_CONTRACT_ID=CCEM6DMMVFLPJHZIDN5TM3SPQPZKYPBMXE4HN3HFRZILF3MJQ4I76VUR
+NEXT_PUBLIC_WORK_PROFILE_CONTRACT_ID=CCAHTMF7PDOB2KM4SIDDHBW2AMVGEWCTLKG3BSYJNTFGMASSGMKO6OKT
 ```
 
-#### Deploy Lending Contract
+### Running the Application
+
+1. **Start the development server**
 ```bash
-cd contracts/lending
-stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/lending.wasm \
-  --source-account <YOUR_ACCOUNT> \
-  --network testnet
+cd frontend
+npm run dev
 ```
 
-#### Deploy Work Profile Contract
-```bash
-cd contracts/work-profile
-stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/work_profile.wasm \
+2. **Access the application**
+Open [http://localhost:3000](http://localhost:3000) in your browser
+
+3. **Connect Freighter Wallet**
+   - Install Freighter browser extension
+   - Create or import a Stellar account
+   - Switch to testnet mode
+   - Fund your account with test XLM
+
+## 📱 Usage Guide
+
+### For Employers
+
+1. **Create Salary Stream**
+   - Navigate to the dashboard
+   - Enter employee's Stellar address
+   - Set total amount and duration
+   - Confirm transaction in Freighter
+
+2. **Manage Streams**
+   - Monitor active streams in real-time
+   - Pause streams temporarily
+   - Resume paused streams
+   - End streams permanently
+
+### For Employees
+
+1. **Monitor Earnings**
+   - View real-time earnings accumulation
+   - Check available withdrawal amounts
+   - Track withdrawal history
+
+2. **Withdraw Funds**
+   - Partial withdrawals as needed
+   - Full withdrawal of available amount
+   - Instant settlement on Stellar
+
+3. **Apply for Loans**
+   - Use active streams as collateral
+   - Complete work profile for better rates
+   - Submit loan applications
+
+### For Loan Administrators
+
+1. **Review Applications**
+   - Evaluate loan requests
+   - Check borrower risk profiles
+   - Approve or reject with feedback
+
+2. **Monitor Loans**
+   - Track active loans
+   - Monitor repayment schedules
+   - Manage defaults and collections
+## 🏦 Risk Tiers & Interest Rates
+
+| Tier | Risk Level | APR | Description |
+|------|------------|-----|-------------|
+| 1 | Very Low | 4.0% | Excellent credit, stable employment |
+| 2 | Low | 4.5% | Good credit, consistent income |
+| 3 | Medium | 5.0% | Average risk profile |
+| 4 | High | 5.5% | Higher risk, shorter employment |
+| 5 | Very High | 6.0% | Highest risk tier |
+
+## � Smart Contract Functions
+
+### Salary Streaming Contract
+
+```rust
+// Create a new salary stream
+pub fn create_stream(
+    env: Env,
+    employer: Address,
+    employee: Address,
+    total_amount: u64,
+    duration_seconds: u64,
+) -> Result<u32, ContractError>
+
+// Withdraw from stream
+pub fn withdraw(
+    env: Env,
+    stream_id: u32,
+    amount: u64,
+    employee: Address,
+) -> Result<(), ContractError>
+
+// Pause/resume/end stream (employer only)
+pub fn pause_stream(env: Env, stream_id: u32, employer: Address)
+pub fn resume_stream(env: Env, stream_id: u32, employer: Address)
+pub fn end_stream(env: Env, stream_id: u32, employer: Address)
+
+// Get stream information
+pub fn get_stream(env: Env, stream_id: u32) -> Result<Stream, ContractError>
+pub fn get_all_streams(env: Env) -> Vec<Stream>
+```
+
+### Lending Contract
+
+```rust
+// Request a loan using stream as collateral
+pub fn request_loan(
+    env: Env,
+    amount: u64,
+    risk_tier: u32,
+    collateral_stream_id: u32,
+    borrower: Address,
+) -> Result<u32, ContractError>
+
+// Approve/reject loan (admin only)
+pub fn approve_loan(env: Env, loan_id: u32, admin: Address) -> Result<(), ContractError>
+pub fn reject_loan(env: Env, loan_id: u32, admin: Address) -> Result<(), ContractError>
+
+// Repay loan
+pub fn repay_loan(
+    env: Env,
+    loan_id: u32,
+    amount: u64,
+    borrower: Address,
+) -> Result<(), ContractError>
+
+// Get loan information
+pub fn get_loan(env: Env, loan_id: u32) -> Result<Loan, ContractError>
+pub fn get_all_loans(env: Env) -> Vec<Loan>
+pub fn get_borrower_loans(env: Env, borrower: Address) -> Vec<u32>
+```
+
+### Work Profile Contract
+
+```rust
+// Create or update work profile
+pub fn update_profile(
+    env: Env,
+    user: Address,
+    years_experience: u32,
+    current_job_duration: u32,
+    job_changes: u32,
+    sector: String,
+) -> Result<(), ContractError>
+
+// Get user profile and risk assessment
+pub fn get_profile(env: Env, user: Address) -> Result<WorkProfile, ContractError>
+pub fn calculate_risk_score(env: Env, user: Address) -> Result<u32, ContractError>
+```
   --source-account <YOUR_ACCOUNT> \
   --network testnet
 ```
