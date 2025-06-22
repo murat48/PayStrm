@@ -1,4 +1,4 @@
-# � PayStream - Real-Time Salary Streaming & DeFi Lending Platform
+# PayStream - Real-Time Salary Streaming & DeFi Lending Platform
 
 <div align="center">
 
