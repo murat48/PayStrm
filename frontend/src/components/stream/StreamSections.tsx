@@ -70,9 +70,9 @@ export default function StreamSection({ publicKey }: StreamSectionProps) {
   const [isWithdrawing, setIsWithdrawing] = useState<number | null>(null);
   const [withdrawAmounts, setWithdrawAmounts] = useState<{ [key: number]: string }>({});
   const [newStream, setNewStream] = useState({
-    employee: 'GCNA5EMJNXZPO57ARVJYQ5SN2DYYPD6ZCCENQ5AQTMVNKN77RDIPMI3A',
-    amount: '100000000000',
-    duration: '30'
+    employee: '',
+    amount: '',
+    duration: ''
   });
 
   // Lending states
@@ -83,6 +83,7 @@ export default function StreamSection({ publicKey }: StreamSectionProps) {
   const [isApprovingLoan, setIsApprovingLoan] = useState<number | null>(null);
   const [isRejectingLoan, setIsRejectingLoan] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  
   const [showLendingSection, setShowLendingSection] = useState(false);
   
   // Repayment states
@@ -1250,7 +1251,7 @@ export default function StreamSection({ publicKey }: StreamSectionProps) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold text-gray-900">Stream #{stream.id}</h4>
+                        <h4 className="font-semibold text-gray-900">Contract {stream.id}</h4>
                         <div className="flex gap-1">
                           {stream.isActive ? (
                             <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
@@ -1433,7 +1434,7 @@ export default function StreamSection({ publicKey }: StreamSectionProps) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold text-gray-900">Stream #{stream.id}</h4>
+                        <h4 className="font-semibold text-gray-900">Contract {stream.id}</h4>
                         <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">
                           ⏸️ Paused
                         </span>
@@ -1521,7 +1522,7 @@ export default function StreamSection({ publicKey }: StreamSectionProps) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold text-gray-900">Stream #{stream.id}</h4>
+                        <h4 className="font-semibold text-gray-900">Contract {stream.id}</h4>
                         <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">
                           ❌ Inactive
                         </span>

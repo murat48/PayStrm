@@ -86,7 +86,29 @@ export default function HomePage() {
             <DollarSign className="h-8 w-8 text-blue-600" />
             <h1 className="text-2xl font-bold text-gray-900">PayStream</h1>
           </div>
-          <div className="text-sm text-gray-600">Stellar Testnet</div>
+          {!isConnected ? (
+            <button
+              onClick={connectWallet}
+              disabled={isLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <>
+                  <Wallet className="h-4 w-4" />
+                  <span>Connect Freighter Wallet</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <div className="flex items-center space-x-2 bg-green-100 text-green-700 px-3 py-2 rounded-lg">
+              <Wallet className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                {publicKey ? `${publicKey.slice(0, 6)}...${publicKey.slice(-6)}` : 'Connected'}
+              </span>
+            </div>
+          )}
         </div>
       </header>
 
