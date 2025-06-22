@@ -593,7 +593,7 @@ stellar contract deploy \
 
 ---
 ### Contract Screen
-<img src="/salary.jpg" alt="Salary Contract" width="400"/><img src="/lending.jpg" alt="Lending Contract" width="400"/>
+<img src="/salary.jpg" alt="Salary Contract" width="400"/><br> <br> <img src="/lending.jpg" alt="Lending Contract" width="400"/>
 <div align="center">
 
 **🌟 Built with ❤️ on Stellar Blockchain 🌟**
