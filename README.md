@@ -592,7 +592,8 @@ stellar contract deploy \
 - **Security Issues**: Report privately via email
 
 ---
-
+##Contract Screen
+<img src="/salary.jpg" alt="Salary Contract" width="200"/>
 <div align="center">
 
 **🌟 Built with ❤️ on Stellar Blockchain 🌟**
